@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="mine-counter">Mines: 0</div>
+    <div id="mine-counter">Remaining Mines : 0</div>
     <div id="controls">
         <button onclick="setDifficulty('easy')">Easy</button>
         <button onclick="setDifficulty('medium')">Medium</button>
@@ -55,13 +55,16 @@
                 cell.addEventListener('contextmenu', rightClickCell);
                 board.appendChild(cell);
             }
+            if(minesRemaining){
+                updateMineCounter()
+            }
         }
 
         const mineCounter = document.getElementById('mine-counter');
         let minesRemaining = mineCount;
 
         function updateMineCounter() {
-            mineCounter.textContent = `Mines: ${minesRemaining}`;
+            mineCounter.textContent = `Remaining Mines: ${minesRemaining}`;
         }
 
         function placeMines(firstClickIndex) {
@@ -259,6 +262,7 @@
 
         window.setDifficulty = function(level) {
             currentDifficulty = level;
+            mineCounter.textContent = `Remaining Mines: ${difficulties[currentDifficulty].mines}`;
             initializeGame();
         };
 
