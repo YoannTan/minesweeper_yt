@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minesweeper</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="mine-counter">Mines: 0</div>
+    <div id="controls">
+        <button onclick="setDifficulty('easy')">Easy</button>
+        <button onclick="setDifficulty('medium')">Medium</button>
+        <button onclick="setDifficulty('hard')">Hard</button>
+        <button onclick="setDifficulty('extreme')">Extreme</button>
+        <!--<button onclick="setDifficulty('custom')">Custom</button>-->
+    </div>
+    <div id="game">
+        <div id="board"></div>
+    </div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const difficulties = {
+            easy: { width: 8, height: 8, mines: 10 },
+            medium: { width: 16, height: 16, mines: 55 },
+            hard: { width: 30, height: 16, mines: 99 },
+            extreme: { width: 30, height: 30, mines: 199 },
+            custom: { width: 50, height: 20, mines: 150 } // Custom difficulty
+        };
+
+        let currentDifficulty = 'easy';
+        let boardWidth, boardHeight, mineCount;
+        let firstClick = true; // Flag to track the first click
+
+        const board = document.getElementById('board');
+        const mines = new Set();
+        const flags = new Set();
+        const revealed = new Set();
+
+        function initializeGame() {
+            board.innerHTML = '';
+            mines.clear();
+            flags.clear();
+            revealed.clear();
+            firstClick = true;
+
+            ({ width: boardWidth, height: boardHeight, mines: mineCount } = difficulties[currentDifficulty]);
+            board.style.gridTemplateColumns = `repeat(${boardWidth}, 20px)`; // Adjust cell size if necessary
+
+            for (let i = 0; i < boardWidth * boardHeight; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.index = i;
+                cell.addEventListener('click', clickCell);
+                cell.addEventListener('contextmenu', rightClickCell);
+                board.appendChild(cell);
+            }
+        }
+
+        const mineCounter = document.getElementById('mine-counter');
+        let minesRemaining = mineCount;
+
+        function updateMineCounter() {
+            mineCounter.textContent = `Mines: ${minesRemaining}`;
+        }
+
+        function placeMines(firstClickIndex) {
+            while (mines.size < mineCount) {
+                const potentialMineIndex = Math.floor(Math.random() * boardWidth * boardHeight);
+                if (potentialMineIndex !== firstClickIndex && !isAdjacent(potentialMineIndex, firstClickIndex)) {
+                    mines.add(potentialMineIndex);
+                }
+            }
+            minesRemaining = mineCount;
+            updateMineCounter();
+        }
+
+        function isAdjacent(index1, index2) {
+            const x1 = index1 % boardWidth;
+            const y1 = Math.floor(index1 / boardWidth);
+            const x2 = index2 % boardWidth;
+            const y2 = Math.floor(index2 / boardWidth);
+            return Math.abs(x1 - x2) <= 1 && Math.abs(y1 - y2) <= 1;
+        }
+
+        function countMines(index) {
+            let count = 0;
+            const x = index % boardWidth;
+            const y = Math.floor(index / boardWidth);
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < boardWidth && ny >= 0 && ny < boardHeight) {
+                        if (mines.has(ny * boardWidth + nx)) {
+                        count++;
+                        }
+                    }
+                }
+            }
+            return count;
+        }
+
+        function revealCell(cell, index) {
+            if (revealed.has(index) || mines.has(index) || flags.has(index)) return;
+            revealed.add(index);
+            cell.classList.add('revealed');
+            const mineCount = countMines(index);
+
+            if (mineCount === 0) {
+                const x = index % boardWidth;
+                const y = Math.floor(index / boardWidth);
+
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < boardWidth && ny >= 0 && ny < boardHeight) {
+                            const neighborIndex = ny * boardWidth + nx;
+                            const neighborCell = board.children[neighborIndex];
+                            revealCell(neighborCell, neighborIndex);
+                        }
+                    }
+                }
+            } else {
+                cell.textContent = mineCount;
+                cell.style.color = getNumberColor(mineCount);
+            }
+
+            cell.addEventListener('click', () => chordOnCell(index));
+        }
+
+        function getNumberColor(mineCount) {
+            const colors = ['#2a48ec', '#2ab82e', '#ec2a2a', '#00008b', '#8b0000', '#008b8b', '#b8860b', '#a9a9a9'];
+            return colors[mineCount - 1] || '#000';
+        }
+
+        function clickCell(event) {
+            console.log("test")
+            const cell = event.target;
+            const index = parseInt(cell.dataset.index);
+
+            if (flags.has(index)) return;
+            
+            if (firstClick) {
+                placeMines(index); // Place mines after the first click
+                firstClick = false; // Change the flag after the first click
+                revealCell(cell, index);
+                return; // Exit the function to avoid revealing a mine on the first click
+            }
+
+            if (mines.has(index)) {
+                cell.classList.add('mine');
+                cell.textContent = '💣';
+                alert('Boom! Game over.');
+                revealMines();
+            } else {
+                revealCell(cell, index);
+            }
+        }
+
+        function rightClickCell(event) {
+            event.preventDefault();
+            const cell = event.target;
+            const index = parseInt(cell.dataset.index);
+
+            if (revealed.has(index)) return;
+
+            if (flags.has(index)) {
+                flags.delete(index);
+                cell.textContent = '';
+                cell.classList.remove('flag');
+                minesRemaining++; // Increment mine count as flag is removed
+            } else if (!revealed.has(index) && minesRemaining > 0) {
+                flags.add(index);
+                cell.textContent = '🚩';
+                cell.classList.add('flag');
+                minesRemaining--; // Decrement mine count as flag is placed
+            }
+
+            updateMineCounter(); // Update the mine counter display
+
+            if (checkWin()) {
+                alert('Congratulations, you win!');
+                revealMines(true); // Optional: show all mines on win
+            }
+        }
+
+        function countFlagsAround(index) {
+            let count = 0;
+            const x = index % boardWidth;
+            const y = Math.floor(index / boardWidth);
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < boardWidth && ny >= 0 && ny < boardHeight) {
+                        const neighborIndex = ny * boardWidth + nx;
+                        if (flags.has(neighborIndex)) {
+                        count++;
+                        }
+                    }
+                }
+            }
+            return count;
+        }
+
+        function chordOnCell(index) {
+            if (!revealed.has(index)) return;
+
+            const mineCount = countMines(index);
+            const flagCount = countFlagsAround(index);
+
+            if (mineCount !== flagCount) return;
+
+            const x = index % boardWidth;
+            const y = Math.floor(index / boardWidth);
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < boardWidth && ny >= 0 && ny < boardHeight) {
+                        const neighborIndex = ny * boardWidth + nx;
+                        if (!flags.has(neighborIndex)) {
+                            const neighborCell = board.children[neighborIndex];
+                            if (mines.has(neighborIndex)) {
+                                neighborCell.classList.add('mine');
+                                neighborCell.textContent = '💣';
+                                alert('Boom! Game over.');
+                                revealMines();
+                                return;
+                            }
+                            revealCell(neighborCell, neighborIndex);
+                        }
+                    }
+                }
+            }
+        }
+
+        function revealMines() {
+            for (const mineIndex of mines) {
+                const mineCell = board.children[mineIndex];
+                mineCell.classList.add('mine');
+                mineCell.textContent = '💣';
+            }
+            // Optionally disable further clicks on the board here
+        }
+
+        function checkWin() {
+            if (flags.size !== mineCount) return false;
+            for (let index of flags) {
+            if (!mines.has(index)) return false;
+            }
+            return true;
+        }
+
+        window.setDifficulty = function(level) {
+            currentDifficulty = level;
+            initializeGame();
+        };
+
+        initializeGame(); // Initialize the game at the start
+    });
+</script>
+</body>
+</html>
