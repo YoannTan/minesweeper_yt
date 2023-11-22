@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div id="game-status"></div>
     <div id="mine-counter">Remaining Mines : 0</div>
     <div id="controls">
         <button onclick="setDifficulty('easy')">Easy</button>
@@ -30,12 +31,21 @@
 
         let currentDifficulty = 'easy';
         let boardWidth, boardHeight, mineCount;
-        let firstClick = true; // Flag to track the first click
+        let firstClick = true;
+        let gameActive = true;
 
         const board = document.getElementById('board');
+        const gameStatus = document.getElementById('game-status');
         const mines = new Set();
         const flags = new Set();
         const revealed = new Set();
+
+        function setGameStatus(message, isWin) {
+            gameStatus.textContent = message;
+            document.body.className = isWin ? 'win-background' : 'lose-background';
+            gameStatus.className = isWin ? 'win-message' : 'lose-message';
+            gameActive = false;
+        }
 
         function initializeGame() {
             board.innerHTML = '';
@@ -43,6 +53,12 @@
             flags.clear();
             revealed.clear();
             firstClick = true;
+            gameActive = true;
+            gameStatus.textContent = "  ";
+
+            gameStatus.textContent = '';
+            document.body.className = '';
+            gameStatus.className = '';
 
             ({ width: boardWidth, height: boardHeight, mines: mineCount } = difficulties[currentDifficulty]);
             board.style.gridTemplateColumns = `repeat(${boardWidth}, 20px)`; // Adjust cell size if necessary
@@ -140,23 +156,22 @@
         }
 
         function clickCell(event) {
-            console.log("test")
+            if (!gameActive) return;
+
             const cell = event.target;
             const index = parseInt(cell.dataset.index);
 
             if (flags.has(index)) return;
             
             if (firstClick) {
-                placeMines(index); // Place mines after the first click
-                firstClick = false; // Change the flag after the first click
-                revealCell(cell, index);
-                return; // Exit the function to avoid revealing a mine on the first click
+                placeMines(index);
+                firstClick = false;
             }
 
             if (mines.has(index)) {
                 cell.classList.add('mine');
                 cell.textContent = '💣';
-                alert('Boom! Game over.');
+                setGameStatus('Boom! Game over.', false);
                 revealMines();
             } else {
                 revealCell(cell, index);
@@ -164,6 +179,7 @@
         }
 
         function rightClickCell(event) {
+            if (!gameActive) return;
             event.preventDefault();
             const cell = event.target;
             const index = parseInt(cell.dataset.index);
@@ -185,7 +201,7 @@
             updateMineCounter(); // Update the mine counter display
 
             if (checkWin()) {
-                alert('Congratulations, you win!');
+                //alert('Congratulations, you win!');
                 revealMines(true); // Optional: show all mines on win
             }
         }
@@ -211,7 +227,7 @@
         }
 
         function chordOnCell(index) {
-            if (!revealed.has(index)) return;
+            if (!gameActive || !revealed.has(index)) return;
 
             const mineCount = countMines(index);
             const flagCount = countFlagsAround(index);
@@ -232,11 +248,13 @@
                             if (mines.has(neighborIndex)) {
                                 neighborCell.classList.add('mine');
                                 neighborCell.textContent = '💣';
-                                alert('Boom! Game over.');
+                                setGameStatus('Boom! Game over.', false);
                                 revealMines();
-                                return;
+                                return; // Stop further execution as the game is over
                             }
-                            revealCell(neighborCell, neighborIndex);
+                            if (!revealed.has(neighborIndex)) {
+                                revealCell(neighborCell, neighborIndex);
+                            }
                         }
                     }
                 }
@@ -244,19 +262,20 @@
         }
 
         function revealMines() {
-            for (const mineIndex of mines) {
+            mines.forEach(mineIndex => {
                 const mineCell = board.children[mineIndex];
                 mineCell.classList.add('mine');
                 mineCell.textContent = '💣';
-            }
+            });
             // Optionally disable further clicks on the board here
         }
 
         function checkWin() {
             if (flags.size !== mineCount) return false;
             for (let index of flags) {
-            if (!mines.has(index)) return false;
+                if (!mines.has(index)) return false;
             }
+            setGameStatus('Congratulations, you win!', true);
             return true;
         }
 
